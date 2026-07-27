@@ -308,14 +308,20 @@
   }
 
   // ---- Auth ----
+  // Catatan: GitHub Pages mengirim header Cross-Origin-Opener-Policy yang
+  // memblokir signInWithPopup, jadi kita pakai signInWithRedirect sebagai gantinya.
   document.getElementById('loginBtn').addEventListener('click', () => {
     const errEl = document.getElementById('loginError');
     errEl.classList.add('hidden');
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => {
-      errEl.textContent = "Gagal login: " + err.message;
-      errEl.classList.remove('hidden');
-    });
+    auth.signInWithRedirect(provider);
+  });
+
+  // Tangkap error dari proses redirect (kalau ada)
+  auth.getRedirectResult().catch(err => {
+    const errEl = document.getElementById('loginError');
+    errEl.textContent = "Gagal login: " + err.message;
+    errEl.classList.remove('hidden');
   });
 
   document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
