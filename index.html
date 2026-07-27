@@ -335,7 +335,13 @@
     showScreen('loadingScreen');
     const email = (user.email || "").toLowerCase();
     try {
-      const doc = await db.collection('whitelist').doc(email).get();
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar.")), 10000)
+      );
+      const doc = await Promise.race([
+        db.collection('whitelist').doc(email).get(),
+        timeout
+      ]);
       if (doc.exists && doc.data().active === true){
         document.getElementById('userEmail').textContent = user.email;
         showScreen('mainScreen');
