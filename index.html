@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BACA Apps</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F2A4A">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy: #0F2A4A;
+    --navy-light: #1B3F6B;
+    --bg: #F4F6F9;
+    --card: #FFFFFF;
+    --text: #182333;
+    --muted: #667085;
+    --border: #E2E7EF;
+    --accent: #3D6FB4;
+    --danger: #B3431E;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ margin:0; padding:0; }
+  body{
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .hidden{ display: none !important; }
+  .screen{ min-height: 100vh; }
+
+  /* Login & Denied screens */
+  #loginScreen, #deniedScreen, #loadingScreen{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-box{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 40px 32px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 4px 24px rgba(15,42,74,0.06);
+  }
+  .login-box h1{
+    color: var(--navy);
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .login-box h2{
+    color: var(--navy);
+    font-size: 20px;
+    margin: 0 0 8px;
+  }
+  .login-box p{
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 24px;
+  }
+  button{
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.15s ease, transform 0.05s ease;
+  }
+  button:active{ transform: scale(0.98); }
+  #loginBtn, #logoutBtnDenied{
+    background: var(--navy);
+    color: #fff;
+    padding: 12px 20px;
+    width: 100%;
+  }
+  #loginBtn:hover, #logoutBtnDenied:hover{ background: var(--navy-light); }
+  .error-text{ color: var(--danger); font-size: 13px; margin-top: 14px; }
+
+  .spinner{
+    width: 34px; height: 34px;
+    border: 3px solid var(--border);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  #loadingScreen{ flex-direction: column; }
+  #loadingScreen p{ color: var(--muted); font-size: 14px; }
+
+  /* Main screen */
+  header{
+    background: var(--navy);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1{
+    font-size: 18px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .user-info{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: #CBD8E8;
+  }
+  #logoutBtn{
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    padding: 7px 14px;
+    font-size: 13px;
+  }
+  #logoutBtn:hover{ background: rgba(255,255,255,0.22); }
+
+  .controls{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 16px 20px 8px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .controls input, .controls select{
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+  }
+  #searchInput{ flex: 1 1 220px; }
+  .controls select{ flex: 0 1 160px; }
+  .controls input:focus, .controls select:focus{
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  #resultCount{
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 20px;
+    max-width: 1200px;
+    margin: 4px auto 0;
+  }
+
+  .card-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+    padding: 12px 20px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card h3{
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: var(--navy);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .field-row{
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    padding: 4px 0;
+  }
+  .field-label{ color: var(--muted); flex-shrink: 0; }
+  .field-value{ color: var(--text); font-weight: 500; text-align: right; }
+
+  .empty-text, .error-text.block{
+    color: var(--muted);
+    font-size: 14px;
+    padding: 40px 20px;
+    text-align: center;
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 480px){
+    .login-box{ padding: 30px 22px; }
+    header h1{ font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div id="loginScreen" class="screen">
+    <div class="login-box">
+      <h1>BACA Apps</h1>
+      <p>Masuk dengan akun Google untuk melihat data.</p>
+      <button id="loginBtn">Masuk dengan Google</button>
+      <p id="loginError" class="error-text hidden"></p>
+    </div>
+  </div>
+
+  <div id="loadingScreen" class="screen hidden">
+    <div class="spinner"></div>
+    <p>Memuat...</p>
+  </div>
+
+  <div id="deniedScreen" class="screen hidden">
+    <div class="login-box">
+      <h2>Akun belum terdaftar</h2>
+      <p>Akun <strong id="deniedEmail"></strong> belum diberi akses ke aplikasi ini. Hubungi admin untuk didaftarkan.</p>
+      <button id="logoutBtnDenied">Keluar &amp; coba akun lain</button>
+    </div>
+  </div>
+
+  <div id="mainScreen" class="screen hidden">
+    <header>
+      <h1>BACA Apps</h1>
+      <div class="user-info">
+        <span id="userEmail"></span>
+        <button id="logoutBtn">Keluar</button>
+      </div>
+    </header>
+
+    <div class="controls">
+      <input type="text" id="searchInput" placeholder="Cari nama...">
+      <select id="cgtFilter">
+        <option value="">Semua CGT</option>
+      </select>
+      <select id="msjFilter">
+        <option value="">Semua MSJ</option>
+      </select>
+    </div>
+
+    <p id="resultCount"></p>
+    <div id="cardGrid" class="card-grid"></div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+  // ---- Firebase config (project: tl-gift-app, publik by design, aman di-commit) ----
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVdB6T5Pj2VBkqPdmQJ8axHQ5_maGZHps",
+    authDomain: "tl-gift-app.firebaseapp.com",
+    projectId: "tl-gift-app",
+    storageBucket: "tl-gift-app.firebasestorage.app",
+    messagingSenderId: "534953662254",
+    appId: "1:534953662254:web:bdc2b075d3f9554c4fccbf"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // ---- Google Sheet source (read-only, via gviz endpoint) ----
+  const SPREADSHEET_ID = "15aKt78stme_EDDY6Q9J2UKyVms7ABfoBm38Vg-aMAjQ";
+  const GID = "0";
+  const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
+
+  // Urutan kolom A..N di Sheet1 -- ubah di sini kalau struktur sheet berubah
+  const COLUMNS = [
+    "NAMA", "TGL LAHIR", "GENDER", "NIJ", "POSISI", "BAPTIS",
+    "MSJ", "CGT", "PELAYANAN", "DEPARTEMEN", "DIVISI",
+    "CONNECT GROUP", "TOTAL KEHADIRAN", "PERSENTASE KEHADIRAN"
+  ];
+
+  let allData = [];
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---- Auth ----
+  document.getElementById('loginBtn').addEventListener('click', () => {
+    const errEl = document.getElementById('loginError');
+    errEl.classList.add('hidden');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => {
+      errEl.textContent = "Gagal login: " + err.message;
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
+  document.getElementById('logoutBtnDenied').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(async (user) => {
+    if (!user){
+      showScreen('loginScreen');
+      return;
+    }
+    showScreen('loadingScreen');
+    const email = (user.email || "").toLowerCase();
+    try {
+      const doc = await db.collection('whitelist').doc(email).get();
+      if (doc.exists && doc.data().active === true){
+        document.getElementById('userEmail').textContent = user.email;
+        showScreen('mainScreen');
+        await loadSheetData();
+      } else {
+        document.getElementById('deniedEmail').textContent = user.email;
+        showScreen('deniedScreen');
+      }
+    } catch (err){
+      document.getElementById('deniedEmail').textContent =
+        (user.email || "") + " (gagal cek akses: " + err.message + ")";
+      showScreen('deniedScreen');
+    }
+  });
+
+  // ---- Data loading ----
+  async function loadSheetData(){
+    const grid = document.getElementById('cardGrid');
+    try {
+      const res = await fetch(SHEET_URL);
+      const text = await res.text();
+      const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const data = JSON.parse(jsonStr);
+      const rows = data.table.rows || [];
+
+      allData = rows.map(r => {
+        const obj = {};
+        COLUMNS.forEach((col, i) => {
+          const cell = r.c ? r.c[i] : null;
+          let val = "";
+          if (cell){
+            if (cell.f !== null && cell.f !== undefined) val = cell.f;
+            else if (cell.v !== null && cell.v !== undefined) val = cell.v;
+          }
+          obj[col] = val;
+        });
+        return obj;
+      }).filter(o => String(o["NAMA"]).trim() !== "");
+
+      populateFilters();
+      renderCards(allData);
+    } catch (err){
+      grid.innerHTML = `<p class="error-text block">Gagal memuat data dari Google Sheet: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  function populateFilters(){
+    const cgtSet = new Set();
+    const msjSet = new Set();
+    allData.forEach(d => {
+      if (d["CGT"]) cgtSet.add(String(d["CGT"]));
+      if (d["MSJ"]) msjSet.add(String(d["MSJ"]));
+    });
+    const cgtSel = document.getElementById('cgtFilter');
+    const msjSel = document.getElementById('msjFilter');
+    [...cgtSet].sort().forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      cgtSel.appendChild(opt);
+    });
+    [...msjSet].sort().forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      msjSel.appendChild(opt);
+    });
+  }
+
+  function applyFilters(){
+    const search = document.getElementById('searchInput').value.trim().toLowerCase();
+    const cgt = document.getElementById('cgtFilter').value;
+    const msj = document.getElementById('msjFilter').value;
+    const filtered = allData.filter(d => {
+      if (search && !String(d["NAMA"]).toLowerCase().includes(search)) return false;
+      if (cgt && String(d["CGT"]) !== cgt) return false;
+      if (msj && String(d["MSJ"]) !== msj) return false;
+      return true;
+    });
+    renderCards(filtered);
+  }
+
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+  document.getElementById('cgtFilter').addEventListener('change', applyFilters);
+  document.getElementById('msjFilter').addEventListener('change', applyFilters);
+
+  function renderCards(list){
+    const grid = document.getElementById('cardGrid');
+    document.getElementById('resultCount').textContent = `${list.length} orang ditemukan`;
+
+    if (list.length === 0){
+      grid.innerHTML = `<p class="empty-text">Tidak ada data yang cocok dengan pencarian/filter.</p>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(d => `
+      <div class="card">
+        <h3>${escapeHtml(String(d["NAMA"]))}</h3>
+        <div class="card-fields">
+          ${COLUMNS.slice(1).map(col => `
+            <div class="field-row">
+              <span class="field-label">${escapeHtml(col)}</span>
+              <span class="field-value">${escapeHtml(String(d[col] ?? "-") || "-")}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ---- PWA service worker ----
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
