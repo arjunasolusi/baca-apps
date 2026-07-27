@@ -289,7 +289,7 @@
   const db = firebase.firestore();
   // Paksa long-polling (bukan streaming) -- mengatasi kasus umum "get() menggantung
   // tanpa error" akibat proxy/antivirus/jaringan yang merusak koneksi streaming Firestore.
-  db.settings({ experimentalForceLongPolling: true, useFetchStreams: false, merge: true });
+  db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, useFetchStreams: false });
 
   // ---- Google Sheet source (read-only, via gviz endpoint) ----
   const SPREADSHEET_ID = "15aKt78stme_EDDY6Q9J2UKyVms7ABfoBm38Vg-aMAjQ";
