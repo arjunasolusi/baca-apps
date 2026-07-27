@@ -270,11 +270,11 @@
 
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-<script>
   // ---- Firebase config (project: tl-gift-app, publik by design, aman di-commit) ----
   const firebaseConfig = {
     apiKey: "AIzaSyCVdB6T5Pj2VBkqPdmQJ8axHQ5_maGZHps",
@@ -284,17 +284,13 @@
     messagingSenderId: "534953662254",
     appId: "1:534953662254:web:bdc2b075d3f9554c4fccbf"
   };
-  console.log("[DEBUG] 1. Mulai inisialisasi Firebase...");
-  firebase.initializeApp(firebaseConfig);
-  console.log("[DEBUG] 2. firebase.initializeApp() selesai.");
-  const auth = firebase.auth();
-  console.log("[DEBUG] 3. firebase.auth() selesai, instance dibuat:", !!auth);
-  const db = firebase.firestore();
-  console.log("[DEBUG] 4. firebase.firestore() selesai, instance dibuat:", !!db);
-  // Paksa long-polling (bukan streaming) -- mengatasi kasus umum "get() menggantung
-  // tanpa error" akibat proxy/antivirus/jaringan yang merusak koneksi streaming Firestore.
-  db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, useFetchStreams: false });
-  console.log("[DEBUG] 5. db.settings() long-polling diterapkan.");
+  console.log("[DEBUG] 1. Mulai inisialisasi Firebase (modular SDK)...");
+  const firebaseApp = initializeApp(firebaseConfig);
+  console.log("[DEBUG] 2. initializeApp() selesai.");
+  const auth = getAuth(firebaseApp);
+  console.log("[DEBUG] 3. getAuth() selesai, instance dibuat:", !!auth);
+  const db = getFirestore(firebaseApp);
+  console.log("[DEBUG] 4. getFirestore() selesai, instance dibuat:", !!db);
 
   // ---- Google Sheet source (read-only, via gviz endpoint) ----
   const SPREADSHEET_ID = "15aKt78stme_EDDY6Q9J2UKyVms7ABfoBm38Vg-aMAjQ";
@@ -332,9 +328,9 @@
     console.log("[DEBUG] 9. handleCredentialResponse dipanggil, id_token diterima:", !!response.credential);
     const errEl = document.getElementById('loginError');
     errEl.classList.add('hidden');
-    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    const credential = GoogleAuthProvider.credential(response.credential);
     console.log("[DEBUG] 10. Credential Firebase dibuat, memanggil signInWithCredential()...");
-    auth.signInWithCredential(credential).then(() => {
+    signInWithCredential(auth, credential).then(() => {
       console.log("[DEBUG] 11. signInWithCredential() BERHASIL.");
     }).catch(err => {
       console.log("[DEBUG] 11-ERROR. signInWithCredential() GAGAL:", err.code, err.message);
@@ -364,10 +360,10 @@
     }
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
-  document.getElementById('logoutBtnDenied').addEventListener('click', () => auth.signOut());
+  document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+  document.getElementById('logoutBtnDenied').addEventListener('click', () => signOut(auth));
 
-  auth.onAuthStateChanged(async (user) => {
+  onAuthStateChanged(auth, async (user) => {
     console.log("[DEBUG] 12. onAuthStateChanged terpanggil. User:", user ? user.email : null);
     if (!user){
       showScreen('loginScreen');
@@ -379,17 +375,17 @@
     try {
       const timeout = new Promise((_, reject) =>
         setTimeout(() => {
-          console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, db.collection('whitelist').doc().get() belum juga selesai (tidak resolve, tidak reject).");
+          console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, getDoc(whitelist) belum juga selesai (tidak resolve, tidak reject).");
           reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar."));
         }, 10000)
       );
-      console.log("[DEBUG] 14. Memanggil db.collection('whitelist').doc('" + email + "').get() ...");
-      const doc = await Promise.race([
-        db.collection('whitelist').doc(email).get(),
+      console.log("[DEBUG] 14. Memanggil getDoc(doc(db, 'whitelist', '" + email + "')) ...");
+      const wlSnap = await Promise.race([
+        getDoc(doc(db, 'whitelist', email)),
         timeout
       ]);
-      console.log("[DEBUG] 15. get() SELESAI (tidak menggantung). doc.exists =", doc.exists, "data =", doc.exists ? doc.data() : null);
-      if (doc.exists && doc.data().active === true){
+      console.log("[DEBUG] 15. getDoc() SELESAI (tidak menggantung). exists =", wlSnap.exists(), "data =", wlSnap.exists() ? wlSnap.data() : null);
+      if (wlSnap.exists() && wlSnap.data().active === true){
         console.log("[DEBUG] 16. Email whitelisted, lanjut ke mainScreen.");
         document.getElementById('userEmail').textContent = user.email;
         showScreen('mainScreen');
@@ -400,7 +396,7 @@
         showScreen('deniedScreen');
       }
     } catch (err){
-      console.log("[DEBUG] 15-ERROR. get() gagal/timeout. Kode error:", err.code, "Pesan:", err.message);
+      console.log("[DEBUG] 15-ERROR. getDoc() gagal/timeout. Kode error:", err.code, "Pesan:", err.message);
       document.getElementById('deniedEmail').textContent =
         (user.email || "") + " (gagal cek akses: " + err.message + ")";
       showScreen('deniedScreen');
