@@ -286,7 +286,7 @@
     messagingSenderId: "534953662254",
     appId: "1:534953662254:web:bdc2b075d3f9554c4fccbf"
   };
-  console.log("[DEBUG] 1. Mulai inisialisasi Firebase -- VERSI REST-MANUAL-v5-apikey --");
+  console.log("[DEBUG] 1. Mulai inisialisasi Firebase -- VERSI PUBLIC-READ-v6 --");
   const firebaseApp = initializeApp(firebaseConfig);
   console.log("[DEBUG] 2. initializeApp() selesai.");
   const auth = getAuth(firebaseApp);
@@ -372,28 +372,18 @@
     }
     showScreen('loadingScreen');
     const email = (user.email || "").toLowerCase();
-    console.log("[DEBUG] 13. Mulai cek whitelist untuk email:", email);
+    console.log("[DEBUG] 13. Mulai cek whitelist (tanpa token, akses publik) untuk email:", email);
     try {
-      console.log("[DEBUG] 13a. Mengambil ID token...");
-      const idToken = await user.getIdToken();
-      console.log("[DEBUG] 13b. ID token didapat, panjang:", idToken.length);
-      try {
-        const payload = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        console.log("[DEBUG] 13c. Isi token -- aud:", payload.aud, "| iss:", payload.iss, "| email:", payload.email, "| exp:", new Date(payload.exp * 1000).toISOString());
-      } catch (decodeErr){
-        console.log("[DEBUG] 13c-ERROR. Gagal decode token untuk inspeksi:", decodeErr.message);
-      }
-
-      const restUrl = `https://firestore.googleapis.com/v1/projects/tl-gift-app/databases/(default)/documents/whitelist/${encodeURIComponent(email)}?key=${firebaseConfig.apiKey}`;
+      const restUrl = `https://firestore.googleapis.com/v1/projects/tl-gift-app/databases/(default)/documents/whitelist/${encodeURIComponent(email)}`;
       const timeout = new Promise((_, reject) =>
         setTimeout(() => {
           console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, fetch REST Firestore belum juga selesai.");
           reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar."));
         }, 10000)
       );
-      console.log("[DEBUG] 14. Memanggil fetch REST:", restUrl);
+      console.log("[DEBUG] 14. Memanggil fetch REST (tanpa header Authorization):", restUrl);
       const res = await Promise.race([
-        fetch(restUrl, { headers: { Authorization: `Bearer ${idToken}` } }),
+        fetch(restUrl),
         timeout
       ]);
       console.log("[DEBUG] 15. fetch SELESAI (tidak menggantung). HTTP status:", res.status);
