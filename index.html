@@ -284,12 +284,17 @@
     messagingSenderId: "534953662254",
     appId: "1:534953662254:web:bdc2b075d3f9554c4fccbf"
   };
+  console.log("[DEBUG] 1. Mulai inisialisasi Firebase...");
   firebase.initializeApp(firebaseConfig);
+  console.log("[DEBUG] 2. firebase.initializeApp() selesai.");
   const auth = firebase.auth();
+  console.log("[DEBUG] 3. firebase.auth() selesai, instance dibuat:", !!auth);
   const db = firebase.firestore();
+  console.log("[DEBUG] 4. firebase.firestore() selesai, instance dibuat:", !!db);
   // Paksa long-polling (bukan streaming) -- mengatasi kasus umum "get() menggantung
   // tanpa error" akibat proxy/antivirus/jaringan yang merusak koneksi streaming Firestore.
   db.settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false, useFetchStreams: false });
+  console.log("[DEBUG] 5. db.settings() long-polling diterapkan.");
 
   // ---- Google Sheet source (read-only, via gviz endpoint) ----
   const SPREADSHEET_ID = "15aKt78stme_EDDY6Q9J2UKyVms7ABfoBm38Vg-aMAjQ";
@@ -324,17 +329,24 @@
   const GOOGLE_CLIENT_ID = "534953662254-n2c793kj0gjsb86nf2a6qu3b4jfc7bq9.apps.googleusercontent.com";
 
   function handleCredentialResponse(response){
+    console.log("[DEBUG] 9. handleCredentialResponse dipanggil, id_token diterima:", !!response.credential);
     const errEl = document.getElementById('loginError');
     errEl.classList.add('hidden');
     const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
-    auth.signInWithCredential(credential).catch(err => {
+    console.log("[DEBUG] 10. Credential Firebase dibuat, memanggil signInWithCredential()...");
+    auth.signInWithCredential(credential).then(() => {
+      console.log("[DEBUG] 11. signInWithCredential() BERHASIL.");
+    }).catch(err => {
+      console.log("[DEBUG] 11-ERROR. signInWithCredential() GAGAL:", err.code, err.message);
       errEl.textContent = "Gagal login: " + err.message;
       errEl.classList.remove('hidden');
     });
   }
 
   window.addEventListener('load', () => {
+    console.log("[DEBUG] 6. window load event, cek google.accounts.id...");
     if (window.google && google.accounts && google.accounts.id){
+      console.log("[DEBUG] 7. Google Identity Services tersedia, initialize()...");
       google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: handleCredentialResponse
@@ -343,7 +355,9 @@
         document.getElementById('googleBtnContainer'),
         { theme: 'filled_blue', size: 'large', shape: 'rectangular', text: 'signin_with', locale: 'id', width: 280 }
       );
+      console.log("[DEBUG] 8. Tombol Google berhasil dirender.");
     } else {
+      console.log("[DEBUG] 7-ERROR. google.accounts.id TIDAK tersedia (script GIS gagal dimuat).");
       const errEl = document.getElementById('loginError');
       errEl.textContent = "Gagal memuat layanan login Google. Coba muat ulang halaman.";
       errEl.classList.remove('hidden');
@@ -354,29 +368,39 @@
   document.getElementById('logoutBtnDenied').addEventListener('click', () => auth.signOut());
 
   auth.onAuthStateChanged(async (user) => {
+    console.log("[DEBUG] 12. onAuthStateChanged terpanggil. User:", user ? user.email : null);
     if (!user){
       showScreen('loginScreen');
       return;
     }
     showScreen('loadingScreen');
     const email = (user.email || "").toLowerCase();
+    console.log("[DEBUG] 13. Mulai cek whitelist untuk email:", email);
     try {
       const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar.")), 10000)
+        setTimeout(() => {
+          console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, db.collection('whitelist').doc().get() belum juga selesai (tidak resolve, tidak reject).");
+          reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar."));
+        }, 10000)
       );
+      console.log("[DEBUG] 14. Memanggil db.collection('whitelist').doc('" + email + "').get() ...");
       const doc = await Promise.race([
         db.collection('whitelist').doc(email).get(),
         timeout
       ]);
+      console.log("[DEBUG] 15. get() SELESAI (tidak menggantung). doc.exists =", doc.exists, "data =", doc.exists ? doc.data() : null);
       if (doc.exists && doc.data().active === true){
+        console.log("[DEBUG] 16. Email whitelisted, lanjut ke mainScreen.");
         document.getElementById('userEmail').textContent = user.email;
         showScreen('mainScreen');
         await loadSheetData();
       } else {
+        console.log("[DEBUG] 16-DENIED. Email TIDAK whitelisted atau active != true.");
         document.getElementById('deniedEmail').textContent = user.email;
         showScreen('deniedScreen');
       }
     } catch (err){
+      console.log("[DEBUG] 15-ERROR. get() gagal/timeout. Kode error:", err.code, "Pesan:", err.message);
       document.getElementById('deniedEmail').textContent =
         (user.email || "") + " (gagal cek akses: " + err.message + ")";
       showScreen('deniedScreen');
