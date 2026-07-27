@@ -273,7 +273,9 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
-  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-lite.js";
+  // Firestore diakses langsung lewat REST API (bukan SDK) supaya kita kontrol penuh
+  // token otentikasinya -- menghindari isu WebChannel/streaming yang sebelumnya
+  // menggantung, sekaligus menghindari bug auto-attach token di Firestore Lite SDK.
 
   // ---- Firebase config (project: tl-gift-app, publik by design, aman di-commit) ----
   const firebaseConfig = {
@@ -289,8 +291,7 @@
   console.log("[DEBUG] 2. initializeApp() selesai.");
   const auth = getAuth(firebaseApp);
   console.log("[DEBUG] 3. getAuth() selesai, instance dibuat:", !!auth);
-  const db = getFirestore(firebaseApp);
-  console.log("[DEBUG] 4. getFirestore() selesai, instance dibuat:", !!db);
+  console.log("[DEBUG] 4. (Firestore diakses via REST manual, tidak pakai SDK Firestore.)");
 
   // ---- Google Sheet source (read-only, via gviz endpoint) ----
   const SPREADSHEET_ID = "15aKt78stme_EDDY6Q9J2UKyVms7ABfoBm38Vg-aMAjQ";
@@ -373,30 +374,51 @@
     const email = (user.email || "").toLowerCase();
     console.log("[DEBUG] 13. Mulai cek whitelist untuk email:", email);
     try {
+      console.log("[DEBUG] 13a. Mengambil ID token...");
+      const idToken = await user.getIdToken();
+      console.log("[DEBUG] 13b. ID token didapat, panjang:", idToken.length);
+
+      const restUrl = `https://firestore.googleapis.com/v1/projects/tl-gift-app/databases/(default)/documents/whitelist/${encodeURIComponent(email)}`;
       const timeout = new Promise((_, reject) =>
         setTimeout(() => {
-          console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, getDoc(whitelist) belum juga selesai (tidak resolve, tidak reject).");
+          console.log("[DEBUG] 14-TIMEOUT. 10 detik berlalu, fetch REST Firestore belum juga selesai.");
           reject(new Error("Waktu habis (10 detik) menunggu jawaban dari Firestore. Kemungkinan koneksi terblokir atau Rules belum benar."));
         }, 10000)
       );
-      console.log("[DEBUG] 14. Memanggil getDoc(doc(db, 'whitelist', '" + email + "')) ...");
-      const wlSnap = await Promise.race([
-        getDoc(doc(db, 'whitelist', email)),
+      console.log("[DEBUG] 14. Memanggil fetch REST:", restUrl);
+      const res = await Promise.race([
+        fetch(restUrl, { headers: { Authorization: `Bearer ${idToken}` } }),
         timeout
       ]);
-      console.log("[DEBUG] 15. getDoc() SELESAI (tidak menggantung). exists =", wlSnap.exists(), "data =", wlSnap.exists() ? wlSnap.data() : null);
-      if (wlSnap.exists() && wlSnap.data().active === true){
-        console.log("[DEBUG] 16. Email whitelisted, lanjut ke mainScreen.");
-        document.getElementById('userEmail').textContent = user.email;
-        showScreen('mainScreen');
-        await loadSheetData();
-      } else {
-        console.log("[DEBUG] 16-DENIED. Email TIDAK whitelisted atau active != true.");
+      console.log("[DEBUG] 15. fetch SELESAI (tidak menggantung). HTTP status:", res.status);
+
+      if (res.status === 200){
+        const data = await res.json();
+        const active = !!(data.fields && data.fields.active && data.fields.active.booleanValue === true);
+        console.log("[DEBUG] 15b. Dokumen ditemukan. active =", active);
+        if (active){
+          console.log("[DEBUG] 16. Email whitelisted, lanjut ke mainScreen.");
+          document.getElementById('userEmail').textContent = user.email;
+          showScreen('mainScreen');
+          await loadSheetData();
+        } else {
+          console.log("[DEBUG] 16-DENIED. Field active bukan true.");
+          document.getElementById('deniedEmail').textContent = user.email;
+          showScreen('deniedScreen');
+        }
+      } else if (res.status === 404){
+        console.log("[DEBUG] 16-DENIED. Dokumen whitelist tidak ditemukan (404).");
         document.getElementById('deniedEmail').textContent = user.email;
+        showScreen('deniedScreen');
+      } else {
+        const errBody = await res.text();
+        console.log("[DEBUG] 15-ERROR. HTTP status tidak terduga:", res.status, errBody);
+        document.getElementById('deniedEmail').textContent =
+          user.email + " (gagal cek akses: HTTP " + res.status + " - " + errBody + ")";
         showScreen('deniedScreen');
       }
     } catch (err){
-      console.log("[DEBUG] 15-ERROR. getDoc() gagal/timeout. Kode error:", err.code, "Pesan:", err.message);
+      console.log("[DEBUG] 15-ERROR. fetch gagal/timeout. Pesan:", err.message);
       document.getElementById('deniedEmail').textContent =
         (user.email || "") + " (gagal cek akses: " + err.message + ")";
       showScreen('deniedScreen');
