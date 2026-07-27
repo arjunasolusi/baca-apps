@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --navy: #0F2A4A;
@@ -79,13 +80,18 @@
     transition: background 0.15s ease, transform 0.05s ease;
   }
   button:active{ transform: scale(0.98); }
-  #loginBtn, #logoutBtnDenied{
+  #logoutBtnDenied{
     background: var(--navy);
     color: #fff;
     padding: 12px 20px;
     width: 100%;
   }
-  #loginBtn:hover, #logoutBtnDenied:hover{ background: var(--navy-light); }
+  #logoutBtnDenied:hover{ background: var(--navy-light); }
+  .google-btn-container{
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
+  }
   .error-text{ color: var(--danger); font-size: 13px; margin-top: 14px; }
 
   .spinner{
@@ -221,7 +227,7 @@
     <div class="login-box">
       <h1>BACA Apps</h1>
       <p>Masuk dengan akun Google untuk melihat data.</p>
-      <button id="loginBtn">Masuk dengan Google</button>
+      <div id="googleBtnContainer" class="google-btn-container"></div>
       <p id="loginError" class="error-text hidden"></p>
     </div>
   </div>
@@ -308,20 +314,37 @@
   }
 
   // ---- Auth ----
-  // Catatan: GitHub Pages mengirim header Cross-Origin-Opener-Policy yang
-  // memblokir signInWithPopup, jadi kita pakai signInWithRedirect sebagai gantinya.
-  document.getElementById('loginBtn').addEventListener('click', () => {
+  // Catatan: GitHub Pages (COOP) memblokir signInWithPopup, dan browser modern
+  // memblokir storage pihak-ketiga yang dibutuhkan signInWithRedirect. Jadi kita
+  // pakai Google Identity Services (tombol resmi Google, tanpa iframe/cookie
+  // pihak ketiga), lalu tukar id_token-nya ke Firebase Auth.
+  const GOOGLE_CLIENT_ID = "534953662254-n2c793kj0gjsb86nf2a6qu3b4jfc7bq9.apps.googleusercontent.com";
+
+  function handleCredentialResponse(response){
     const errEl = document.getElementById('loginError');
     errEl.classList.add('hidden');
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider);
-  });
+    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    auth.signInWithCredential(credential).catch(err => {
+      errEl.textContent = "Gagal login: " + err.message;
+      errEl.classList.remove('hidden');
+    });
+  }
 
-  // Tangkap error dari proses redirect (kalau ada)
-  auth.getRedirectResult().catch(err => {
-    const errEl = document.getElementById('loginError');
-    errEl.textContent = "Gagal login: " + err.message;
-    errEl.classList.remove('hidden');
+  window.addEventListener('load', () => {
+    if (window.google && google.accounts && google.accounts.id){
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('googleBtnContainer'),
+        { theme: 'filled_blue', size: 'large', shape: 'rectangular', text: 'signin_with', locale: 'id', width: 280 }
+      );
+    } else {
+      const errEl = document.getElementById('loginError');
+      errEl.textContent = "Gagal memuat layanan login Google. Coba muat ulang halaman.";
+      errEl.classList.remove('hidden');
+    }
   });
 
   document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
